@@ -20,6 +20,8 @@ namespace IncidentSpreadsheet
         // at ~/.credentials/sheets.googleapis.com-dotnet-quickstart.json
         static string[] Scopes = { SheetsService.Scope.Spreadsheets };
         static string ApplicationName = "IncidentSpreadsheet";
+        static string LogFolderPath = "//home/coreyf/gst_dashboard/data";
+        static string TestFolderPath = "C://cygwin/home/SLUGIS/documents";
 
         static SheetsService service;
 
@@ -28,9 +30,34 @@ namespace IncidentSpreadsheet
 
         static void Main(string[] args)
         {
+            string sheetName;
+            if (args.Length == 2)
+            {
+                if (args[1] == "1")
+                {
+                    sheetName = "TestSheet";
+                }
+                else
+                {
+                    Console.WriteLine("Incorrect number of arguments.\nusage: incidentSpreadsheet\ntesting usage: incidentSpreadsheet 1");
+                    return;
+                }
+            }
+            else if (args.Length > 3)
+            {
+                //bad
+                Console.WriteLine("Incorrect number of arguments.\nusage: incidentSpreadsheet\ntesting usage: incidentSpreadsheet 1");
+                return;
+            }
+            else
+            {
+                sheetName = "GoogleSheet";
+            }
+
             // Populate the incidents
+            Console.WriteLine("Grabbing incident information...");
             Incidents incidents = new Incidents();
-            incidents.PopulateIncidents();
+            incidents.PopulateIncidents(LogFolderPath);
 
             // Create User Credential
             UserCredential credential = GetUserCredential();
@@ -42,8 +69,11 @@ namespace IncidentSpreadsheet
                 ApplicationName = ApplicationName,
             });
 
+            Console.WriteLine("Executing...");
             // Create Append Request
-            SpreadsheetsResource.ValuesResource.AppendRequest appendRequest = GetAppendRequest("TestSheet", incidents);
+            SpreadsheetsResource.ValuesResource.AppendRequest appendRequest = GetAppendRequest(sheetName, incidents);
+
+            Console.WriteLine("Incidents to be added: {0}", incidents.GetIncidents().Count);
 
             // Execute
             appendRequest.Execute();
@@ -94,9 +124,52 @@ namespace IncidentSpreadsheet
             incidents = new List<Incident>();
         }
 
-        public void PopulateIncidents()
+        public void PopulateIncidents(string directory)
         {
-            
+            string[] filePaths = Directory.GetFiles(directory, "*_Log.txt");
+
+            foreach (string file in filePaths)
+            {
+                if (DateTime.Compare(File.GetLastWriteTime(file), DateTime.Today.AddDays(-1)) >= 0)
+                {
+                    AddIncident(file);
+                }
+            }
+        }
+
+        private void AddIncident(string filepath)
+        {
+            string line;
+            Incident temp;
+            using (StreamReader reader = new StreamReader(filepath))
+            {
+                while ((line = reader.ReadLine()) != null)
+                {
+                    string[] fields = line.Split(new[] { '|' }, StringSplitOptions.None);
+                    try
+                    {
+                        if (fields[5] == "FOAW" || fields[5].Contains("FWL") || (fields[5].Contains("FVC") && fields[5].Contains("W"))
+                            || fields[5] == "FOO" || fields[5] == "FOD" || fields[5] == "FSRW" || fields[5] == "MTC" || fields[5] == "FVP")
+                        {
+                            temp = new Incident
+                            {
+                                details = fields[6],
+                                latitude = fields[7],
+                                longitude = fields[8],
+                                time = fields[4],
+                                event_id = fields[1],
+                                incident_id = fields[2],
+                                type = fields[5]
+                            };
+                            incidents.Add(temp);
+                        }
+                    }
+                    catch
+                    {
+                        continue;
+                    }
+                }
+            }
         }
 
         public List<Incident> GetIncidents()
@@ -108,7 +181,8 @@ namespace IncidentSpreadsheet
         {
             ValueRange data = new ValueRange
             {
-                Values = new List<IList<object>> { }
+                Values = new List<IList<object>> { },
+                MajorDimension = "ROWS"
             };
 
             foreach (Incident inc in incidents)
@@ -122,16 +196,16 @@ namespace IncidentSpreadsheet
 
     class Incident
     {
-        public string event_id = ""; // 1st item in parsed line
-        public string incident_id = ""; // 2nd item
-        public string category = ""; // 5th item + key'd values of details
-        public string details = ""; // 6th
-        public string type = ""; // 5th item
-        public string address = ""; // 9th item
-        public string jurisdiction = ""; // 10th item
-        public string latitude = ""; // 7th
-        public string longitude = ""; // 7th
-        public string time = ""; // 4th - format as %Y%m%d%H%M%S
+        public string event_id = " "; // 1st item in parsed line
+        public string incident_id = " "; // 2nd item
+        public string category = " "; // 5th item + key'd values of details
+        public string details = " "; // 6th
+        public string type = " "; // 5th item
+        public string address = " "; // 9th item
+        public string jurisdiction = " "; // 10th item
+        public string latitude = " "; // 7th
+        public string longitude = " "; // 7th
+        public string time = " "; // 4th - format as %Y%m%d%H%M%S
 
         public Incident()
         {
