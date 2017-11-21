@@ -19,7 +19,7 @@ namespace IncidentSpreadsheet
         static string[] Scopes = { SheetsService.Scope.Spreadsheets };
         static string ApplicationName = "IncidentSpreadsheet";
         static string LogFolderPath = "//home/coreyf/gst_dashboard/data";
-        static string TestFolderPath = "C://cygwin/home/SLUGIS/documents";
+        static string TestFolderPath = "C://cygwin/home/SLUGIS/documents"; // Change this for retesting in development if not on H15KS52
 
         static SheetsService service;
 
@@ -51,7 +51,6 @@ namespace IncidentSpreadsheet
             {
                 sheetName = "GoogleSheet";
             }
-            sheetName = "TestSheet";
 
             // Populate the incidents
             Console.WriteLine("Grabbing incident information...");
