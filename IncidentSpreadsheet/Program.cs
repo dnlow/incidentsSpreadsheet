@@ -6,11 +6,9 @@ using Google.Apis.Util.Store;
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
-using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
-using System.Collections;
+using System.Text.RegularExpressions;
+using System.Globalization;
 
 namespace IncidentSpreadsheet
 {
@@ -53,11 +51,12 @@ namespace IncidentSpreadsheet
             {
                 sheetName = "GoogleSheet";
             }
+            sheetName = "TestSheet";
 
             // Populate the incidents
             Console.WriteLine("Grabbing incident information...");
             Incidents incidents = new Incidents();
-            incidents.PopulateIncidents(LogFolderPath);
+            incidents.PopulateIncidents(TestFolderPath);
 
             // Create User Credential
             UserCredential credential = GetUserCredential();
@@ -82,7 +81,7 @@ namespace IncidentSpreadsheet
         private static SpreadsheetsResource.ValuesResource.AppendRequest GetAppendRequest(string sheetName, Incidents incidents)
         {
             SpreadsheetsResource.ValuesResource.AppendRequest request;
-            string range = sheetName + "!A:J";
+            string range = sheetName + "!A:A";
 
             request = service.Spreadsheets.Values.Append(incidents.GenerateDataBlock(), spreadsheetID, range);
             request.InsertDataOption = SpreadsheetsResource.ValuesResource.AppendRequest.InsertDataOptionEnum.INSERTROWS;
@@ -130,7 +129,7 @@ namespace IncidentSpreadsheet
 
             foreach (string file in filePaths)
             {
-                if (DateTime.Compare(File.GetLastWriteTime(file), DateTime.Today.AddDays(-1)) >= 0)
+                if (DateTime.Compare(ConvertFilenameToDatetime(file), DateTime.Today.AddDays(-1)) >= 0)
                 {
                     AddIncident(file);
                 }
@@ -191,6 +190,32 @@ namespace IncidentSpreadsheet
             }
 
             return data;
+        }
+
+        /// <summary>
+        ///     Janky ass function to convert the filename/path and grab the year month and date from it
+        ///     Could probably be done with a regex.
+        /// </summary>
+        /// <param name="filepath"></param>
+        /// <returns></returns>
+        private DateTime ConvertFilenameToDatetime(string filepath)
+        {
+            string[] yearString = filepath.Split('_'); // [0] - path+year, [1] - MMdd
+
+            yearString[0] = yearString[0].Remove(0, yearString[0].Length - 4); // remove path and leave year
+
+            char[] monthDateParts = yearString[1].ToCharArray(); // [0-1] MM, [2-3] dd
+
+            char[] monthString = { monthDateParts[0], monthDateParts[1] };
+            char[] dayString = { monthDateParts[2], monthDateParts[3] };
+
+            Int32.TryParse(yearString[0].ToString(), out int year);
+            Int32.TryParse(new string(monthString), out int month);
+            Int32.TryParse(new string(dayString), out int day);
+
+            DateTime date = new DateTime(year, month, day);
+
+            return date;
         }
     }
 
