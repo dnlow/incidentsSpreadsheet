@@ -9,6 +9,7 @@ using System.IO;
 using System.Threading;
 using System.Text.RegularExpressions;
 using System.Globalization;
+using System.Security.Cryptography.X509Certificates;
 
 namespace IncidentSpreadsheet
 {
@@ -28,12 +29,13 @@ namespace IncidentSpreadsheet
 
         static void Main(string[] args)
         {
-            string sheetName;
+            string sheetName, dataPath;
             if (args.Length == 2)
             {
                 if (args[1] == "1")
                 {
                     sheetName = "TestSheet";
+                    dataPath = TestFolderPath;
                 }
                 else
                 {
@@ -50,22 +52,17 @@ namespace IncidentSpreadsheet
             else
             {
                 sheetName = "GoogleSheet";
+                dataPath = LogFolderPath;
             }
+            sheetName = "TestSheet";
+            dataPath = TestFolderPath;
 
             // Populate the incidents
             Console.WriteLine("Grabbing incident information...");
             Incidents incidents = new Incidents();
-            incidents.PopulateIncidents(TestFolderPath);
+            incidents.PopulateIncidents(dataPath);
 
-            // Create User Credential
-            UserCredential credential = GetUserCredential();
-
-            // Create Google Sheets API Service
-            service = new SheetsService(new BaseClientService.Initializer()
-            {
-                HttpClientInitializer = credential,
-                ApplicationName = ApplicationName,
-            });
+            service = CreateService("slugis@slugis-186423.iam.gserviceaccount.com", "C:/Users/SLUGIS/Documents/DaneITDevelopment/IncidentSpreadsheet/IncidentSpreadsheet/SLUGIS-7c7a36e70ba8.p12");
 
             Console.WriteLine("Executing...");
             // Create Append Request
@@ -81,7 +78,7 @@ namespace IncidentSpreadsheet
         {
             SpreadsheetsResource.ValuesResource.AppendRequest request;
             string range = sheetName + "!A:A";
-
+            
             request = service.Spreadsheets.Values.Append(incidents.GenerateDataBlock(), spreadsheetID, range);
             request.InsertDataOption = SpreadsheetsResource.ValuesResource.AppendRequest.InsertDataOptionEnum.INSERTROWS;
             request.ValueInputOption = SpreadsheetsResource.ValuesResource.AppendRequest.ValueInputOptionEnum.RAW;
@@ -89,27 +86,38 @@ namespace IncidentSpreadsheet
             return request;
         }
 
-        private static UserCredential GetUserCredential()
+        private static SheetsService CreateService(string serviceAccountEmail, string keyFilePath)
         {
-            UserCredential credential;
-
-            using (var stream =
-                new FileStream("client_secret.json", FileMode.Open, FileAccess.Read))
+            if (!File.Exists(keyFilePath))
             {
-                string credPath = Environment.GetFolderPath(
-                    Environment.SpecialFolder.Personal);
-                credPath = Path.Combine(credPath, ".credentials/sheets.googleapis.com-dotnet-quickstart.json");
-
-                credential = GoogleWebAuthorizationBroker.AuthorizeAsync(
-                    GoogleClientSecrets.Load(stream).Secrets,
-                    Scopes,
-                    "user",
-                    CancellationToken.None,
-                    new FileDataStore(credPath, true)).Result;
-                Console.WriteLine("Credential file saved to: " + credPath);
+                Console.WriteLine("An error occurered - key file does not exist.");
+                return null;
             }
 
-            return credential;
+            string[] scopes = { SheetsService.Scope.Spreadsheets };
+
+            var certificate = new X509Certificate2(keyFilePath, "notasecret", X509KeyStorageFlags.Exportable);
+            try
+            {
+                ServiceAccountCredential credential = new ServiceAccountCredential(
+                    new ServiceAccountCredential.Initializer(serviceAccountEmail)
+                    {
+                        Scopes = scopes
+                    }.FromCertificate(certificate));
+
+                SheetsService service = new SheetsService(new BaseClientService.Initializer()
+                {
+                    HttpClientInitializer = credential,
+                    ApplicationName = ApplicationName
+                });
+
+                return service;
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e.InnerException);
+                return null;
+            }
         }
     }
 
